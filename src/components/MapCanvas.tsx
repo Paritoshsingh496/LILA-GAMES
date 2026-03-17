@@ -30,6 +30,8 @@ export default function MapCanvas() {
   const heatmapMode = useStore((s) => s.heatmapMode)
   const heatmapData = useStore((s) => s.heatmapData)
   const selectedMap = useStore((s) => s.selectedMap)
+  const visibleEventTypes = useStore((s) => s.visibleEventTypes)
+  const setSelectedEvent = useStore((s) => s.setSelectedEvent)
 
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
   const [scale, setScale] = useState(1)
@@ -37,6 +39,7 @@ export default function MapCanvas() {
   const [isPanning, setIsPanning] = useState(false)
   const panStart = useRef({ x: 0, y: 0 })
   const offsetStart = useRef({ x: 0, y: 0 })
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string } | null>(null)
 
   // Determine which map to show
   const mapId = currentMatch?.map || (selectedMap !== 'all' ? selectedMap : null)
@@ -132,6 +135,7 @@ export default function MapCanvas() {
       // Draw event markers
       visibleEvents.forEach((evt: PlayerEvent) => {
         if (evt.e === 'P' || evt.e === 'BP') return // skip movement
+        if (!visibleEventTypes.has(evt.e)) return
         const color = EVENT_COLORS[evt.e]
         if (!color) return
 
@@ -154,7 +158,7 @@ export default function MapCanvas() {
         }
       })
     })
-  }, [currentMatch, visiblePlayerIds, showBots, currentTime, mapId])
+  }, [currentMatch, visiblePlayerIds, showBots, currentTime, mapId, visibleEventTypes])
 
   // Draw heatmap
   useEffect(() => {
@@ -235,18 +239,117 @@ export default function MapCanvas() {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!isPanning) return
-      setOffset({
-        x: offsetStart.current.x + (e.clientX - panStart.current.x),
-        y: offsetStart.current.y + (e.clientY - panStart.current.y),
-      })
+      if (isPanning) {
+        setOffset({
+          x: offsetStart.current.x + (e.clientX - panStart.current.x),
+          y: offsetStart.current.y + (e.clientY - panStart.current.y),
+        })
+        setTooltip(null)
+        return
+      }
+
+      // Hit-test player paths
+      if (!currentMatch || !mapId || !containerRef.current) {
+        setTooltip(null)
+        return
+      }
+
+      const canvasWrapper = containerRef.current.querySelector('div')
+      if (!canvasWrapper) { setTooltip(null); return }
+      const rect = canvasWrapper.getBoundingClientRect()
+      const mx = (e.clientX - rect.left) / scale
+      const my = (e.clientY - rect.top) / scale
+
+      const HIT_RADIUS = 8
+      let found: string | null = null
+      let humanIdx = 0
+
+      for (const player of currentMatch.players) {
+        const isHuman = player.human
+        if (!isHuman && !showBots) continue
+        if (isHuman && !visiblePlayerIds.has(player.id)) continue
+        if (!isHuman && !visiblePlayerIds.has(player.id) && showBots) continue
+
+        if (isHuman) humanIdx++
+
+        const posEvents = player.events.filter(
+          (ev: PlayerEvent) => ev.t <= currentTime && (ev.e === 'P' || ev.e === 'BP')
+        )
+
+        for (let i = 0; i < posEvents.length; i++) {
+          const [px, py] = worldToPixel(posEvents[i].x, posEvents[i].z, mapId)
+          const dx = mx - px
+          const dy = my - py
+          if (dx * dx + dy * dy < HIT_RADIUS * HIT_RADIUS) {
+            found = player.id
+            break
+          }
+        }
+        if (found) break
+      }
+
+      if (found) {
+        const player = currentMatch.players.find((p) => p.id === found)
+        const label = player ? `${player.human ? 'Human' : 'Bot'}: ${found}` : found
+        setTooltip({ x: e.clientX, y: e.clientY, label })
+      } else {
+        setTooltip(null)
+      }
     },
-    [isPanning]
+    [isPanning, currentMatch, mapId, scale, showBots, visiblePlayerIds, currentTime]
   )
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false)
   }, [])
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!currentMatch || !mapId || !containerRef.current) return
+
+      const canvasWrapper = containerRef.current.querySelector('div')
+      if (!canvasWrapper) return
+      const rect = canvasWrapper.getBoundingClientRect()
+      const mx = (e.clientX - rect.left) / scale
+      const my = (e.clientY - rect.top) / scale
+
+      const HIT_RADIUS = 10
+
+      for (const player of currentMatch.players) {
+        const isHuman = player.human
+        if (!isHuman && !showBots) continue
+        if (isHuman && !visiblePlayerIds.has(player.id)) continue
+        if (!isHuman && !visiblePlayerIds.has(player.id) && showBots) continue
+
+        const eventMarkers = player.events.filter(
+          (ev: PlayerEvent) =>
+            ev.t <= currentTime &&
+            ev.e !== 'P' &&
+            ev.e !== 'BP' &&
+            visibleEventTypes.has(ev.e)
+        )
+
+        for (const evt of eventMarkers) {
+          const [px, py] = worldToPixel(evt.x, evt.z, mapId)
+          const dx = mx - px
+          const dy = my - py
+          if (dx * dx + dy * dy < HIT_RADIUS * HIT_RADIUS) {
+            setSelectedEvent({
+              playerId: player.id,
+              human: player.human,
+              event: evt.e,
+              x: evt.x,
+              z: evt.z,
+            })
+            return
+          }
+        }
+      }
+
+      setSelectedEvent(null)
+    },
+    [currentMatch, mapId, scale, showBots, visiblePlayerIds, currentTime, visibleEventTypes, setSelectedEvent]
+  )
 
   const resetView = useCallback(() => {
     setScale(1)
@@ -284,6 +387,7 @@ export default function MapCanvas() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onClick={handleClick}
       >
         <div
           className="relative"
@@ -336,6 +440,16 @@ export default function MapCanvas() {
             <p className="text-lg mb-1">Select a match from the sidebar</p>
             <p className="text-sm">or use heatmaps to explore map-wide patterns</p>
           </div>
+        </div>
+      )}
+
+      {/* Player path tooltip */}
+      {tooltip && (
+        <div
+          className="fixed z-50 px-2 py-1 text-xs bg-[var(--bg-primary)] border border-[var(--border)] rounded shadow-lg text-[var(--text-primary)] pointer-events-none"
+          style={{ left: tooltip.x + 12, top: tooltip.y - 8 }}
+        >
+          {tooltip.label}
         </div>
       )}
     </div>

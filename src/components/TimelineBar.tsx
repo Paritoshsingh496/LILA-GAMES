@@ -37,7 +37,7 @@ export default function TimelineBar() {
     setIsPlaying(false)
   }
 
-  const speeds = [1, 2, 4, 8]
+  const speeds = [0.5, 1, 2]
 
   return (
     <div className="bg-[var(--bg-secondary)] border-t border-[var(--border)] px-4 py-3">

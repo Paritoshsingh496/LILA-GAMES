@@ -29,7 +29,7 @@ export function usePlayback() {
       const delta = now - lastFrameTime.current
       lastFrameTime.current = now
 
-      const advance = delta * playbackSpeed * 10
+      const advance = delta * playbackSpeed * 3
       const next = currentTimeRef.current + advance
 
       if (next >= maxTime) {

@@ -78,8 +78,7 @@ function extractDate(file: File): string {
 async function readFile(file: File): Promise<Row[]> {
   const buf = await file.arrayBuffer()
   const date = extractDate(file)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw: Record<string, any>[] = await parquetReadObjects({ file: buf })
+  const raw: Record<string, unknown>[] = await parquetReadObjects({ file: buf }) as Record<string, unknown>[]
 
   return raw.map((r) => ({
     user_id: String(r.user_id ?? ''),
@@ -162,7 +161,9 @@ export async function parseParquetFiles(
 
       pRows.sort((a: Row, b: Row) => a.ts - b.ts)
 
-      const events = pRows.map((r: Row) => {
+      // Build events with heatmap tracking
+      const rawEvents: { x: number; z: number; e: string; event: string }[] = []
+      for (const r of pRows) {
         const abbr = EVENT_ABBREV[r.event] ?? r.event
         eventCounts[abbr] = (eventCounts[abbr] ?? 0) + 1
 
@@ -175,18 +176,55 @@ export async function parseParquetFiles(
           if (r.event === 'Loot') heatGrids[mapId].loot[gy][gx]++
         }
 
-        return {
-          t: Math.round(r.ts - tMin),
+        rawEvents.push({
           x: Math.round(r.x * 100) / 100,
           z: Math.round(r.z * 100) / 100,
           e: abbr,
+          event: r.event,
+        })
+      }
+
+      // Distance-based synthetic timestamps
+      // Assume player moves at ~20 world units/second
+      const ASSUMED_SPEED = 20
+      const ACTION_PAUSE = 500 // ms pause for non-movement events
+      const POSITION_EVENTS = new Set(['Position', 'BotPosition'])
+
+      const syntheticTimes: number[] = [0]
+      for (let i = 1; i < rawEvents.length; i++) {
+        const prev = rawEvents[i - 1]
+        const curr = rawEvents[i]
+        const dx = curr.x - prev.x
+        const dz = curr.z - prev.z
+        const dist = Math.sqrt(dx * dx + dz * dz)
+        // Time in ms = (distance / speed) * 1000
+        let dt = (dist / ASSUMED_SPEED) * 1000
+        // Add a pause for action events (kills, loot, deaths, etc.)
+        if (!POSITION_EVENTS.has(curr.event)) {
+          dt += ACTION_PAUSE
         }
-      })
+        syntheticTimes.push(syntheticTimes[i - 1] + dt)
+      }
+
+      const events = rawEvents.map((r, i) => ({
+        t: Math.round(syntheticTimes[i]),
+        x: r.x,
+        z: r.z,
+        e: r.e,
+      }))
 
       players.push({ id: userId, human, events })
     }
 
     players.sort((a, b) => (a.human === b.human ? 0 : a.human ? -1 : 1))
+
+    // Calculate match duration from synthetic timestamps
+    let matchDuration = 0
+    for (const p of players) {
+      for (const ev of p.events) {
+        if (ev.t > matchDuration) matchDuration = ev.t
+      }
+    }
 
     entries.push({
       id: matchId,
@@ -194,7 +232,7 @@ export async function parseParquetFiles(
       date,
       humans: players.filter((p) => p.human).length,
       bots: players.filter((p) => !p.human).length,
-      duration: Math.round(tMax - tMin),
+      duration: matchDuration,
       events: eventCounts,
     })
 

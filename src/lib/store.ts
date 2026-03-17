@@ -13,7 +13,8 @@ interface AppState {
 
   // Filters
   selectedMap: string
-  selectedDate: string
+  selectedDateFrom: string
+  selectedDateTo: string
   searchQuery: string
 
   // Match selection
@@ -32,6 +33,12 @@ interface AppState {
   // Upload modal
   showUploadModal: boolean
 
+  // Event type visibility
+  visibleEventTypes: Set<string>
+
+  // Selected event details
+  selectedEvent: { playerId: string; human: boolean; event: string; x: number; z: number } | null
+
   // Heatmap
   heatmapMode: HeatmapMode
 
@@ -44,7 +51,8 @@ interface AppState {
   setLoading: (loading: boolean) => void
   setUploading: (uploading: boolean) => void
   setSelectedMap: (map: string) => void
-  setSelectedDate: (date: string) => void
+  setSelectedDateFrom: (date: string) => void
+  setSelectedDateTo: (date: string) => void
   setSearchQuery: (query: string) => void
   setSelectedMatchId: (id: string | null) => void
   selectMatch: (id: string) => void
@@ -57,6 +65,8 @@ interface AppState {
   setPlaybackSpeed: (speed: number) => void
   setShowUploadModal: (show: boolean) => void
   setHeatmapMode: (mode: HeatmapMode) => void
+  toggleEventType: (eventType: string) => void
+  setSelectedEvent: (event: AppState['selectedEvent']) => void
   clearData: () => void
 }
 
@@ -69,7 +79,8 @@ export const useStore = create<AppState>((set, get) => ({
   uploading: false,
 
   selectedMap: 'all',
-  selectedDate: 'all',
+  selectedDateFrom: 'all',
+  selectedDateTo: 'all',
   searchQuery: '',
 
   selectedMatchId: null,
@@ -84,6 +95,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   showUploadModal: false,
 
+  visibleEventTypes: new Set(['K', 'D', 'BK', 'BD', 'S', 'L']),
+  selectedEvent: null,
+
   heatmapMode: 'off',
 
   setMatchIndex: (index) => set({ matchIndex: index }),
@@ -97,7 +111,8 @@ export const useStore = create<AppState>((set, get) => ({
   setLoading: (loading) => set({ loading }),
   setUploading: (uploading) => set({ uploading }),
   setSelectedMap: (map) => set({ selectedMap: map }),
-  setSelectedDate: (date) => set({ selectedDate: date }),
+  setSelectedDateFrom: (date) => set({ selectedDateFrom: date }),
+  setSelectedDateTo: (date) => set({ selectedDateTo: date }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSelectedMatchId: (id) => set({ selectedMatchId: id }),
 
@@ -119,9 +134,10 @@ export const useStore = create<AppState>((set, get) => ({
       selectedMatchId: id,
       currentMatch: data,
       isPlaying: false,
-      currentTime: maxT,
+      currentTime: 0,
       maxTime: maxT,
       visiblePlayerIds: new Set(humanIds),
+      selectedEvent: null,
     })
   },
 
@@ -144,6 +160,17 @@ export const useStore = create<AppState>((set, get) => ({
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
   setShowUploadModal: (show) => set({ showUploadModal: show }),
   setHeatmapMode: (mode) => set({ heatmapMode: mode }),
+  toggleEventType: (eventType) =>
+    set((state) => {
+      const next = new Set(state.visibleEventTypes)
+      if (next.has(eventType)) {
+        next.delete(eventType)
+      } else {
+        next.add(eventType)
+      }
+      return { visibleEventTypes: next }
+    }),
+  setSelectedEvent: (event) => set({ selectedEvent: event }),
 
   clearData: () => {
     clearStoredData().catch(() => {})
@@ -153,7 +180,8 @@ export const useStore = create<AppState>((set, get) => ({
       currentMatch: null,
       heatmapData: {},
       selectedMap: 'all',
-      selectedDate: 'all',
+      selectedDateFrom: 'all',
+      selectedDateTo: 'all',
       searchQuery: '',
       selectedMatchId: null,
       visiblePlayerIds: new Set(),

@@ -4,6 +4,53 @@ import { useCallback, useRef, useState } from 'react'
 import { useStore } from '@/lib/store'
 import { parseParquetFiles } from '@/lib/parquetParser'
 import { saveData } from '@/lib/storage'
+import type { MatchIndex, HeatmapData } from '@/lib/types'
+
+function mergeHeatmaps(
+  existing: Record<string, HeatmapData>,
+  incoming: Record<string, HeatmapData>
+): Record<string, HeatmapData> {
+  const merged = { ...existing }
+  for (const mapId of Object.keys(incoming)) {
+    if (!merged[mapId]) {
+      merged[mapId] = incoming[mapId]
+    } else {
+      const e = merged[mapId]
+      const n = incoming[mapId]
+      merged[mapId] = {
+        ...e,
+        kills: e.kills.map((row, y) => row.map((v, x) => v + (n.kills[y]?.[x] ?? 0))),
+        deaths: e.deaths.map((row, y) => row.map((v, x) => v + (n.deaths[y]?.[x] ?? 0))),
+        traffic: e.traffic.map((row, y) => row.map((v, x) => v + (n.traffic[y]?.[x] ?? 0))),
+        loot: e.loot.map((row, y) => row.map((v, x) => v + (n.loot[y]?.[x] ?? 0))),
+      }
+    }
+  }
+  return merged
+}
+
+function mergeMatchIndex(existing: MatchIndex | null, incoming: MatchIndex): MatchIndex {
+  if (!existing) return incoming
+
+  // Deduplicate matches by id
+  const existingIds = new Set(existing.matches.map((m) => m.id))
+  const newMatches = incoming.matches.filter((m) => !existingIds.has(m.id))
+  const allMatches = [...existing.matches, ...newMatches]
+
+  const maps = [...new Set([...existing.stats.maps, ...incoming.stats.maps])].sort()
+  const dates = [...new Set([...existing.stats.dates, ...incoming.stats.dates])].sort()
+
+  return {
+    matches: allMatches,
+    stats: {
+      totalMatches: allMatches.length,
+      totalPlayers: existing.stats.totalPlayers + incoming.stats.totalPlayers,
+      totalEvents: existing.stats.totalEvents + incoming.stats.totalEvents,
+      maps,
+      dates,
+    },
+  }
+}
 
 export default function UploadZone() {
   const showUploadModal = useStore((s) => s.showUploadModal)
@@ -16,6 +63,7 @@ export default function UploadZone() {
   const [dragging, setDragging] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [summary, setSummary] = useState<{ matches: number; players: number; events: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -32,20 +80,33 @@ export default function UploadZone() {
           setProgress({ done, total })
         })
 
-        setMatchIndex(result.matchIndex)
-        setMatchDataMap(result.matchDataMap)
-        setAllHeatmapData(result.heatmapData)
+        const existingIndex = useStore.getState().matchIndex
+        const existingDataMap = useStore.getState().matchDataMap
+        const existingHeatmap = useStore.getState().heatmapData
+
+        const mergedIndex = mergeMatchIndex(existingIndex, result.matchIndex)
+        const mergedDataMap = { ...existingDataMap, ...result.matchDataMap }
+        const mergedHeatmap = mergeHeatmaps(existingHeatmap, result.heatmapData)
+
+        setMatchIndex(mergedIndex)
+        setMatchDataMap(mergedDataMap)
+        setAllHeatmapData(mergedHeatmap)
 
         await saveData({
-          matchIndex: result.matchIndex,
-          matchDataMap: result.matchDataMap,
-          heatmapData: result.heatmapData,
+          matchIndex: mergedIndex,
+          matchDataMap: mergedDataMap,
+          heatmapData: mergedHeatmap,
         })
 
-        setShowUploadModal(false)
+        setSummary({
+          matches: mergedIndex.stats.totalMatches,
+          players: mergedIndex.stats.totalPlayers,
+          events: mergedIndex.stats.totalEvents,
+        })
       } catch (err) {
         console.error('Parse error:', err)
-        setError(err instanceof Error ? err.message : 'Failed to parse files')
+        const msg = err instanceof Error ? err.message.replace(/\s*\(.*?\)/g, '') : 'Failed to parse files'
+        setError(msg)
       } finally {
         setUploading(false)
         setProgress(null)
@@ -120,7 +181,20 @@ export default function UploadZone() {
             }
           `}
         >
-          {progress ? (
+          {summary ? (
+            <>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-green-400">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <div className="text-sm text-[var(--text-primary)] font-medium">
+                Data loaded successfully
+              </div>
+              <div className="text-xs text-[var(--text-secondary)] text-center">
+                {summary.matches} matches &middot; {summary.players} players &middot; {summary.events.toLocaleString()} events
+              </div>
+            </>
+          ) : progress ? (
             <>
               <div className="w-10 h-10 border-[3px] border-[var(--border)] border-t-[var(--accent)] rounded-full animate-spin" />
               <div className="text-sm text-[var(--text-primary)]">
@@ -155,27 +229,35 @@ export default function UploadZone() {
           )}
         </div>
 
-        {!progress && (
-          <div className="flex gap-3 mt-4">
+        {summary ? (
+          <div className="mt-4">
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 px-4 py-2.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:border-[var(--text-secondary)] transition-colors"
+              onClick={() => { setSummary(null); setShowUploadModal(false) }}
+              className="w-full px-4 py-2.5 text-sm rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors"
             >
-              Select Files
-            </button>
-            <button
-              onClick={() => folderInputRef.current?.click()}
-              className="flex-1 px-4 py-2.5 text-sm rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors"
-            >
-              Select Folder
+              Continue
             </button>
           </div>
-        )}
-
-        {!progress && (
-          <p className="text-xs text-[var(--text-secondary)] text-center mt-3">
-            Use &quot;Select Folder&quot; to auto-detect dates from folder names (e.g. February_10)
-          </p>
+        ) : !progress && (
+          <>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 px-4 py-2.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:border-[var(--text-secondary)] transition-colors"
+              >
+                Select Files
+              </button>
+              <button
+                onClick={() => folderInputRef.current?.click()}
+                className="flex-1 px-4 py-2.5 text-sm rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors"
+              >
+                Select Folder
+              </button>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] text-center mt-3">
+              Use &quot;Select Folder&quot; to auto-detect dates from folder names (e.g. February_10)
+            </p>
+          </>
         )}
 
         {error && (

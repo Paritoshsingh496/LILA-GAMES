@@ -2,13 +2,14 @@
 
 import { useMemo } from 'react'
 import { useStore } from '@/lib/store'
-import { PLAYER_COLORS, EVENT_NAMES } from '@/lib/constants'
+import { PLAYER_COLORS, EVENT_NAMES, EVENT_COLORS } from '@/lib/constants'
 import type { MatchIndexEntry } from '@/lib/types'
 
 export default function Sidebar() {
   const matchIndex = useStore((s) => s.matchIndex)
   const selectedMap = useStore((s) => s.selectedMap)
-  const selectedDate = useStore((s) => s.selectedDate)
+  const selectedDateFrom = useStore((s) => s.selectedDateFrom)
+  const selectedDateTo = useStore((s) => s.selectedDateTo)
   const searchQuery = useStore((s) => s.searchQuery)
   const selectedMatchId = useStore((s) => s.selectedMatchId)
   const currentMatch = useStore((s) => s.currentMatch)
@@ -16,23 +17,33 @@ export default function Sidebar() {
   const showBots = useStore((s) => s.showBots)
 
   const setSelectedMap = useStore((s) => s.setSelectedMap)
-  const setSelectedDate = useStore((s) => s.setSelectedDate)
+  const setSelectedDateFrom = useStore((s) => s.setSelectedDateFrom)
+  const setSelectedDateTo = useStore((s) => s.setSelectedDateTo)
   const setSearchQuery = useStore((s) => s.setSearchQuery)
   const selectMatch = useStore((s) => s.selectMatch)
   const togglePlayerVisibility = useStore((s) => s.togglePlayerVisibility)
   const setShowBots = useStore((s) => s.setShowBots)
+  const visibleEventTypes = useStore((s) => s.visibleEventTypes)
+  const toggleEventType = useStore((s) => s.toggleEventType)
+  const selectedEvent = useStore((s) => s.selectedEvent)
+  const setSelectedEvent = useStore((s) => s.setSelectedEvent)
 
   // Filter matches
+  const sortedDates = useMemo(() => {
+    return matchIndex?.stats.dates.slice().sort() ?? []
+  }, [matchIndex])
+
   const filteredMatches = useMemo(() => {
     if (!matchIndex) return []
     return matchIndex.matches.filter((m: MatchIndexEntry) => {
       if (selectedMap !== 'all' && m.map !== selectedMap) return false
-      if (selectedDate !== 'all' && m.date !== selectedDate) return false
+      if (selectedDateFrom !== 'all' && m.date < selectedDateFrom) return false
+      if (selectedDateTo !== 'all' && m.date > selectedDateTo) return false
       if (searchQuery && !m.id.toLowerCase().includes(searchQuery.toLowerCase()))
         return false
       return true
     })
-  }, [matchIndex, selectedMap, selectedDate, searchQuery])
+  }, [matchIndex, selectedMap, selectedDateFrom, selectedDateTo, searchQuery])
 
   const formatDuration = (ms: number) => {
     const s = Math.floor(ms / 1000)
@@ -58,13 +69,28 @@ export default function Sidebar() {
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex gap-2 items-center">
           <select
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            value={selectedDateFrom}
+            onChange={(e) => setSelectedDateFrom(e.target.value)}
             className="flex-1 px-2 py-1.5 text-sm bg-[var(--bg-tertiary)] border border-[var(--border)] rounded text-[var(--text-primary)] outline-none"
           >
-            <option value="all">All Dates</option>
-            {matchIndex?.stats.dates.map((d) => (
+            <option value="all">From</option>
+            {sortedDates.map((d) => (
+              <option key={d} value={d}>
+                {d.replace('_', ' ')}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-[var(--text-secondary)]">to</span>
+          <select
+            value={selectedDateTo}
+            onChange={(e) => setSelectedDateTo(e.target.value)}
+            className="flex-1 px-2 py-1.5 text-sm bg-[var(--bg-tertiary)] border border-[var(--border)] rounded text-[var(--text-primary)] outline-none"
+          >
+            <option value="all">To</option>
+            {sortedDates.map((d) => (
               <option key={d} value={d}>
                 {d.replace('_', ' ')}
               </option>
@@ -110,6 +136,79 @@ export default function Sidebar() {
           </button>
         ))}
       </div>
+
+      {/* Event Type Filters */}
+      {currentMatch && (
+        <div className="border-t border-[var(--border)]">
+          <div className="px-3 py-2 border-b border-[var(--border)]">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              Event Types
+            </span>
+          </div>
+          <div className="px-3 py-2 flex flex-wrap gap-2">
+            {Object.entries(EVENT_COLORS).map(([key, color]) => (
+              <label
+                key={key}
+                className="flex items-center gap-1.5 text-xs cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleEventTypes.has(key)}
+                  onChange={() => toggleEventType(key)}
+                  className="accent-[var(--accent)]"
+                />
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-[var(--text-secondary)]">
+                  {EVENT_NAMES[key] || key}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Selected Event Details */}
+      {selectedEvent && (
+        <div className="border-t border-[var(--border)] px-3 py-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              Event Details
+            </span>
+            <button
+              onClick={() => setSelectedEvent(null)}
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Event</span>
+              <span className="text-[var(--text-primary)]" style={{ color: EVENT_COLORS[selectedEvent.event] }}>
+                {EVENT_NAMES[selectedEvent.event] || selectedEvent.event}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Player</span>
+              <span className="text-[var(--text-primary)] font-mono text-xs">
+                {selectedEvent.human ? 'Human' : 'Bot'}: {selectedEvent.playerId.substring(0, 12)}...
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Location</span>
+              <span className="text-[var(--text-primary)] font-mono text-xs">
+                ({selectedEvent.x}, {selectedEvent.z})
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Player List (when match selected) */}
       {currentMatch && (
