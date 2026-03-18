@@ -12,6 +12,10 @@
 ## Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/Paritoshsingh496/LILA-GAMES.git
+cd LILA-GAMES
+
 # Install dependencies
 npm install
 
@@ -19,7 +23,7 @@ npm install
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000`.
+Open `http://localhost:3000` in your browser.
 
 ## Build
 
