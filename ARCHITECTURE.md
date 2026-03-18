@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A browser-based visualization tool built for level designers. It provides a visual representation of how players and bots interact with the game environment — helping designers analyse player behavior, identify problem areas, and make informed decisions to improve map design.
+A browser-based visualization tool built for level designers. It provides a visual representation of how players and bots interact with the game environment, helping designers analyse player behavior, identify problem areas, and make informed decisions to improve map design.
 
 ## Tech Stack & Why
 
@@ -35,7 +35,7 @@ The parquet data contains game-engine world coordinates (x, y, z). Coordinates (
 
 ```
 px = ((x - originX) / scale) * 1024
-py = (1 - (z - originZ) / scale) * 1024    ← Y-flipped (game Z-up → canvas Y-down)
+py = (1 - (z - originZ) / scale) * 1024    ← Y is flipped (image origin is top-left)
 ```
 
 These values, including the conversion formula and the Y-flip, were provided in the dataset README for each map.
@@ -64,7 +64,7 @@ These values, including the conversion formula and the Y-flip, were provided in 
 
 | Technical Changes | Product Direction |
 |-------------------|-------------------|
-| Shareable view state via URL, so designers can share exact views with their Lead instead of screenshots | Add analytics within the app to give designers quantitative data (kill/death ratios per area, survival times) to justify map changes |
-| Side-by-side map comparison for A/B analysis before and after a map fix | Conduct user testing sessions with level designers to get approval for the tool and identify further points of friction in their workflow |
-| WebGL rendering to handle larger datasets with more players and smoother zoom/pan at high detail levels | Ongoing communication with level designers to understand evolving needs and prioritize features that reduce their day-to-day friction |
+| Shareable view state via URL, so designers can share exact views with their Lead instead of screenshots | Conduct user testing sessions with level designers to get approval for the tool and identify further points of friction in their workflow |
+| Side-by-side map comparison for A/B analysis before and after a map fix | Add analytics to observe how level designers interact with the tool, identify which features are used most, and use that data to guide future improvements |
+| WebGL rendering to handle larger datasets with more players and smoother zoom/pan at high detail levels | |
 | | Add analytics to observe how level designers interact with the tool, identify which features are used most, and use that data to guide future improvements |
