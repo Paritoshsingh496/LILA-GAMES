@@ -67,4 +67,4 @@ These values, including the conversion formula and the Y-flip, were provided in 
 | Shareable view state via URL, so designers can share exact views with their Lead instead of screenshots | Conduct user testing sessions with level designers to get approval for the tool and identify further points of friction in their workflow |
 | Side-by-side map comparison for A/B analysis before and after a map fix | Add analytics to observe how level designers interact with the tool, identify which features are used most, and use that data to guide future improvements |
 | WebGL rendering to handle larger datasets with more players and smoother zoom/pan at high detail levels | |
-| | Add analytics to observe how level designers interact with the tool, identify which features are used most, and use that data to guide future improvements |
+| |  |
