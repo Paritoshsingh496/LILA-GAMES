@@ -1,14 +1,5 @@
 # LILA BLACK - Player Journey Visualization Tool
 
-## Tech Stack
-
-- Next.js 14 (TypeScript)
-- Zustand (state management)
-- Tailwind CSS (styling)
-- Hyparquet (client-side parquet parsing)
-- HTML5 Canvas (rendering)
-- IndexedDB (local data persistence)
-
 ## Setup
 
 ```bash
