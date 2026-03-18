@@ -132,7 +132,7 @@ export async function parseParquetFiles(
   const datesSet: Record<string, boolean> = {}
   const humanIds: Record<string, boolean> = {}
 
-  const heatGrids: Record<string, { kills: number[][]; deaths: number[][]; traffic: number[][]; loot: number[][] }> = {}
+  const heatGrids: Record<string, { kills: number[][]; deaths: number[][]; traffic: number[][]; loot: number[][]; storm: number[][] }> = {}
 
   for (const matchId of Object.keys(byMatch)) {
     if (existingMatchIds?.has(matchId)) continue
