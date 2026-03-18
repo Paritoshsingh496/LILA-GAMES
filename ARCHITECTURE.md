@@ -49,7 +49,7 @@ These values, including the conversion formula and the Y-flip, were provided in 
 ## Assumptions on Ambiguous Data
 
 - **No meaningful timestamps** — The `ts` field in the parquet data didn't provide useful time deltas between events. We generate synthetic timestamps based on distance between consecutive positions, assuming a player speed of ~20 world units/second, with a 500ms pause for action events (kills, loot, deaths). Playback timing is approximate but gives a realistic sense of flow.
-- **Date extraction** — Dates are extracted from folder names (e.g., `February_10/`), not from the parquet data itself. The date filtering feature depends on this folder structure. If files are uploaded without dated folders, the date defaults to "unknown" and date range filtering won't apply to those matches.
+- **Date extraction** — Dates are extracted from folder names (e.g., `February_10/`), not from the parquet data itself. Since folder names only contain month and day, the year is hardcoded as 2026 based on the dataset README. The date filtering feature depends on this folder structure. If files are uploaded without dated folders, the date defaults to "unknown" and date range filtering won't apply to those matches.
 
 ## Trade-offs
 

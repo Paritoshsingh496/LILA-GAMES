@@ -15,7 +15,7 @@ export default function StatsHeader() {
           <span className="text-[var(--accent)]">LILA</span>
           <span className="text-[var(--text-primary)]"> BLACK</span>
           <span className="text-[var(--text-secondary)] font-normal text-sm ml-2">
-            Player Journey Visualizer
+            Player Journey Visualizer (Assignment by Paritosh Singh)
           </span>
         </h1>
       </div>
