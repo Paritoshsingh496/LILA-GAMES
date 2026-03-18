@@ -46,6 +46,7 @@ export interface HeatmapData {
   deaths: number[][]
   traffic: number[][]
   loot: number[][]
+  storm: number[][]
 }
 
-export type HeatmapMode = 'off' | 'kills' | 'deaths' | 'traffic' | 'loot'
+export type HeatmapMode = 'off' | 'kills' | 'deaths' | 'traffic' | 'loot' | 'storm'

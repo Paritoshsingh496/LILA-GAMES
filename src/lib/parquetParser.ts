@@ -62,14 +62,23 @@ function emptyGrid(): number[][] {
   return Array.from({ length: GRID }, () => new Array<number>(GRID).fill(0))
 }
 
+const MONTH_MAP: Record<string, string> = {
+  january: '01', february: '02', march: '03', april: '04',
+  may: '05', june: '06', july: '07', august: '08',
+  september: '09', october: '10', november: '11', december: '12',
+}
+
 function extractDate(file: File): string {
   // Try to get date from folder name via webkitRelativePath
   // e.g. "February_10/somefile.nakama-0" or "player_data/February_10/somefile"
   const path = (file as { webkitRelativePath?: string }).webkitRelativePath || ''
   const parts = path.split('/')
   for (const part of parts) {
-    if (/^(January|February|March|April|May|June|July|August|September|October|November|December)_\d+$/i.test(part)) {
-      return part
+    const match = /^(January|February|March|April|May|June|July|August|September|October|November|December)_(\d+)$/i.exec(part)
+    if (match) {
+      const month = MONTH_MAP[match[1].toLowerCase()]
+      const day = match[2].padStart(2, '0')
+      return `2026-${month}-${day}`
     }
   }
   return 'Uploaded'
@@ -82,7 +91,7 @@ async function readFile(file: File): Promise<Row[]> {
 
   return raw.map((r) => ({
     user_id: String(r.user_id ?? ''),
-    match_id: String(r.match_id ?? '').replace('.nakama-0', ''),
+    match_id: String(r.match_id ?? ''),
     map_id: String(r.map_id ?? ''),
     x: Number(r.x ?? 0),
     z: Number(r.z ?? 0),
@@ -94,7 +103,8 @@ async function readFile(file: File): Promise<Row[]> {
 
 export async function parseParquetFiles(
   files: File[],
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  existingMatchIds?: Set<string>
 ): Promise<{
   matchIndex: MatchIndex
   matchDataMap: Record<string, MatchData>
@@ -125,6 +135,7 @@ export async function parseParquetFiles(
   const heatGrids: Record<string, { kills: number[][]; deaths: number[][]; traffic: number[][]; loot: number[][] }> = {}
 
   for (const matchId of Object.keys(byMatch)) {
+    if (existingMatchIds?.has(matchId)) continue
     const rows = byMatch[matchId]
     const mapId = rows[0].map_id
     const date = rows[0].date
@@ -133,7 +144,7 @@ export async function parseParquetFiles(
 
     // Init heatmap grids
     if (MAP_CFG[mapId] && !heatGrids[mapId]) {
-      heatGrids[mapId] = { kills: emptyGrid(), deaths: emptyGrid(), traffic: emptyGrid(), loot: emptyGrid() }
+      heatGrids[mapId] = { kills: emptyGrid(), deaths: emptyGrid(), traffic: emptyGrid(), loot: emptyGrid(), storm: emptyGrid() }
     }
 
     // Timestamps
@@ -174,6 +185,7 @@ export async function parseParquetFiles(
           if (r.event === 'Killed' || r.event === 'BotKilled' || r.event === 'KilledByStorm') heatGrids[mapId].deaths[gy][gx]++
           if (r.event === 'Position' || r.event === 'BotPosition') heatGrids[mapId].traffic[gy][gx]++
           if (r.event === 'Loot') heatGrids[mapId].loot[gy][gx]++
+          if (r.event === 'KilledByStorm') heatGrids[mapId].storm[gy][gx]++
         }
 
         rawEvents.push({

@@ -184,6 +184,8 @@ export default function MapCanvas() {
         ? data.deaths
         : heatmapMode === 'traffic'
         ? data.traffic
+        : heatmapMode === 'storm'
+        ? data.storm
         : data.loot
 
     // Find max value for normalization
@@ -203,6 +205,8 @@ export default function MapCanvas() {
         ? 30
         : heatmapMode === 'traffic'
         ? 220
+        : heatmapMode === 'storm'
+        ? 270
         : 120
 
     for (let y = 0; y < data.gridSize; y++) {
@@ -210,8 +214,8 @@ export default function MapCanvas() {
         const val = grid[y][x]
         if (val === 0) continue
 
-        const intensity = Math.pow(val / maxVal, 0.5) // sqrt for better spread
-        const alpha = intensity * 0.6
+        const intensity = Math.pow(val / maxVal, 0.4)
+        const alpha = intensity * 0.85
 
         ctx.fillStyle = `hsla(${hue}, 100%, 50%, ${alpha})`
         ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize)

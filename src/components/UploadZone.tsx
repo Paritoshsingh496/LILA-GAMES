@@ -23,6 +23,7 @@ function mergeHeatmaps(
         deaths: e.deaths.map((row, y) => row.map((v, x) => v + (n.deaths[y]?.[x] ?? 0))),
         traffic: e.traffic.map((row, y) => row.map((v, x) => v + (n.traffic[y]?.[x] ?? 0))),
         loot: e.loot.map((row, y) => row.map((v, x) => v + (n.loot[y]?.[x] ?? 0))),
+        storm: e.storm.map((row, y) => row.map((v, x) => v + (n.storm[y]?.[x] ?? 0))),
       }
     }
   }
@@ -76,13 +77,14 @@ export default function UploadZone() {
       setProgress({ done: 0, total: files.length })
 
       try {
-        const result = await parseParquetFiles(files, (done, total) => {
-          setProgress({ done, total })
-        })
-
         const existingIndex = useStore.getState().matchIndex
         const existingDataMap = useStore.getState().matchDataMap
         const existingHeatmap = useStore.getState().heatmapData
+        const existingMatchIds = new Set(Object.keys(existingDataMap))
+
+        const result = await parseParquetFiles(files, (done, total) => {
+          setProgress({ done, total })
+        }, existingMatchIds)
 
         const mergedIndex = mergeMatchIndex(existingIndex, result.matchIndex)
         const mergedDataMap = { ...existingDataMap, ...result.matchDataMap }

@@ -59,4 +59,5 @@ export const HEATMAP_COLORS: Record<string, { color: string; label: string }> = 
   deaths: { color: 'orange', label: 'Death Zones' },
   traffic: { color: 'blue', label: 'Traffic' },
   loot: { color: 'green', label: 'Loot Spots' },
+  storm: { color: 'purple', label: 'Storm Deaths' },
 }
